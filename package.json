@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "bun run --hot src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "bun run src/server.ts"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
