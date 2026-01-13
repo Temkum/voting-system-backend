@@ -1,31 +1,57 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import passport from 'passport';
-import session from 'express-session'; // For session management
 import http from 'http';
-import { Server } from 'socket.io';
-import Redis from 'ioredis'; // For Bull, but you can use redis package
-import Queue from 'bull';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import dotenv from 'dotenv';
+import { connectDB } from './config/database';
+import { connectRedis } from './config/redis';
+import passport from './config/passport';
+import { initializeSocket } from './services/socket.service';
+import authRoutes from './routes/auth.routes';
+import pollRoutes from './routes/poll.routes';
+import voteRoutes from './routes/vote.routes';
+
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
 
-app.use(express.json());
+app.use(helmet());
+app.use(compression());
 app.use(
-  session({ secret: 'your-secret', resave: false, saveUninitialized: false })
+  cors({
+    origin: process.env.CLIENT_URL,
+    credentials: true,
+  })
 );
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
-app.use(passport.session());
 
-// MongoDB Connection
-mongoose
-  .connect('mongodb://localhost:27017/voting-app')
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+app.use('/api/auth', authRoutes);
+app.use('/api/polls', pollRoutes);
+app.use('/api/votes', voteRoutes);
 
-// Placeholder for routes and more
-app.get('/', (req, res) => res.send('Backend is running'));
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    await connectRedis();
+    initializeSocket(server);
+
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
