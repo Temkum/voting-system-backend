@@ -5,12 +5,13 @@ import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database';
-import { connectRedis } from './config/redis';
+import { connectRedis, redisClient } from './config/redis';
 import passport from './config/passport';
 import { initializeSocket } from './services/socket.service';
 import authRoutes from './routes/auth.routes';
 import pollRoutes from './routes/poll.routes';
 import voteRoutes from './routes/vote.routes';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
@@ -33,8 +34,26 @@ app.use('/api/auth', authRoutes);
 app.use('/api/polls', pollRoutes);
 app.use('/api/votes', voteRoutes);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      mongodb: mongoose.connection.readyState === 1,
+      redis: false,
+    },
+  };
+
+  try {
+    await redisClient.ping();
+    health.services.redis = true;
+  } catch (error) {
+    health.services.redis = false;
+  }
+
+  const statusCode =
+    health.services.mongodb && health.services.redis ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 const PORT = process.env.PORT || 5000;

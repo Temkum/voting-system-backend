@@ -1,12 +1,13 @@
 import { createClient } from 'redis';
 
-let redisClient = null;
+let redisClient: any = null;
 let isRedisAvailable = false;
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const initRedis = async () => {
   try {
     redisClient = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      url: redisUrl,
     });
 
     await redisClient.connect();
