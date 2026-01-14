@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database';
-import { connectRedis, redisClient } from './config/redis';
+import { connectRedis, isRedisAvailable, redisClient } from './config/redis';
 import passport from './config/passport';
 import { initializeSocket } from './services/socket.service';
 import authRoutes from './routes/auth.routes';
@@ -45,8 +45,12 @@ app.get('/health', async (req, res) => {
   };
 
   try {
-    await redisClient.ping();
-    health.services.redis = true;
+    if (redisClient) {
+      await redisClient.ping();
+      health.services.redis = true;
+    } else {
+      health.services.redis = false;
+    }
   } catch (error) {
     health.services.redis = false;
   }
@@ -61,7 +65,13 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
-    await connectRedis();
+
+    if (isRedisAvailable && redisClient) {
+      await redisClient.get('key');
+
+      await connectRedis();
+    }
+
     initializeSocket(server);
 
     server.listen(PORT, () => {
